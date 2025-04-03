@@ -305,6 +305,10 @@ rb_imemo_mark_and_move(VALUE obj, bool reference_updating)
                 }
                 else {
                     vm_cc_invalidate(cc);
+
+                    if (vm_cc_refinement_p(cc)) {
+                        rb_vm_cc_refinement_free(cc);
+                    }
                 }
             }
         }
