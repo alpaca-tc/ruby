@@ -305,15 +305,33 @@ rb_clear_method_cache(VALUE klass_or_module, ID mid)
 static int
 invalidate_cc_refinement(st_data_t key, st_data_t value, st_data_t data)
 {
-    const struct rb_callcache *cc = (const struct rb_callcache *)key;
+	VALUE v = (VALUE)key;
+	bool deleted = false;
+	void *ptr = rb_asan_poisoned_object_p(v);
+	rb_asan_unpoison_object(v, false);
 
-    VM_ASSERT(vm_cc_refinement_p(cc));
+	if (RBASIC(v)->flags) {
+		if (imemo_type_p(v, imemo_callcache)) {
+			const struct rb_callcache *cc = (const struct rb_callcache *)key;
 
-    if (cc->klass) {
-        vm_cc_invalidate(cc);
-    }
+			VM_ASSERT(vm_cc_refinement_p(cc));
 
-    return ST_CONTINUE;
+			if (cc->klass) {
+				vm_cc_invalidate(cc);
+				deleted = true;
+			}
+		}
+	}
+
+	if (ptr) {
+		rb_asan_poison_object(v);
+	}
+
+	if (deleted) {
+		return ST_DELETE;
+	} else {
+		return ST_CONTINUE;
+	}
 }
 
 static st_index_t
@@ -461,12 +479,7 @@ rb_vm_insert_cc_refinement(const struct rb_callcache *cc)
 
     RB_VM_LOCK_ENTER();
     {
-        // fprintf(stderr, "cc_key: %lu\n", key);
         st_insert(vm->cc_refinement_table, key, 1);
-
-        // TODO: 削除
-        // uint32_t count = (uint32_t)rb_st_table_size(vm->cc_refinement_table);
-        // fprintf(stderr, "cc_count: %d\n", count);
     }
     RB_VM_LOCK_LEAVE();
 }
