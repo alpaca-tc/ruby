@@ -3604,6 +3604,17 @@ rb_gc_vm_weak_table_foreach(vm_table_foreach_callback_func callback,
         }
         break;
       }
+      case RB_GC_VM_CC_REFINEMENT_TABLE: {
+        if (vm->cc_refinement_table) {
+            st_foreach_with_replace(
+                vm->cc_refinement_table,
+                vm_weak_table_foreach_weak_key,
+                vm_weak_table_foreach_update_weak_key,
+                (st_data_t)&foreach_data
+            );
+        }
+        break;
+      }
       default:
         rb_bug("rb_gc_vm_weak_table_foreach: unknown table %d", table);
     }
